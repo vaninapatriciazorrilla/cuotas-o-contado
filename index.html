@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Cuotas o contado?</title>
+<meta name="description" content="Calculá en segundos si te conviene pagar en cuotas o al contado, con la inflación esperada.">
+<meta name="theme-color" content="#0f172a">
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--txt:#f1f5f9;--muted:#94a3b8;--ok:#22c55e;--warn:#f59e0b;--acc:#38bdf8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:20px}
+  main{max-width:440px;margin:0 auto}
+  h1{font-size:1.8rem;margin:8px 0 4px}
+  .sub{color:var(--muted);margin-bottom:20px}
+  .card{background:var(--card);border-radius:18px;padding:18px;margin-bottom:16px}
+  label{display:block;font-size:.9rem;color:var(--muted);margin:12px 0 6px}
+  input{width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#0b1220;color:var(--txt);font-size:1.1rem}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  button{width:100%;padding:16px;border:0;border-radius:14px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-top:16px}
+  .main{background:var(--acc);color:#0f172a}
+  .sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+  #res{display:none}
+  .verdict{font-size:1.4rem;font-weight:800;margin-bottom:8px}
+  .big{font-size:2rem;font-weight:800}
+  .line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155}
+  .line:last-child{border:0}
+  small{color:var(--muted)}
+  footer{text-align:center;color:var(--muted);font-size:.85rem;margin-top:24px}
+  footer a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+  <h1>💸 ¿Cuotas o contado?</h1>
+  <p class="sub">Descubrí qué te conviene, teniendo en cuenta la inflación.</p>
+
+  <div class="card">
+    <label>Precio de lista ($)</label>
+    <input id="precio" type="number" inputmode="decimal" placeholder="Ej: 300000">
+
+    <label>Descuento pagando contado (%)</label>
+    <input id="desc" type="number" inputmode="decimal" value="0">
+
+    <div class="row">
+      <div>
+        <label>Cuotas</label>
+        <input id="cuotas" type="number" inputmode="numeric" value="6">
+      </div>
+      <div>
+        <label>Recargo en cuotas (%)</label>
+        <input id="recargo" type="number" inputmode="decimal" value="0">
+      </div>
+    </div>
+
+    <label>Inflación mensual esperada (%)</label>
+    <input id="infl" type="number" inputmode="decimal" value="1.6" step="0.1">
+    <small>Según el REM del BCRA (sep-2026): ~21% en los próximos 12 meses.</small>
+
+    <button class="main" onclick="calcular()">Calcular</button>
+  </div>
+
+  <div class="card" id="res">
+    <div class="verdict" id="verdict"></div>
+    <div class="big" id="ahorro"></div>
+    <small id="ahorroTxt"></small>
+    <div style="margin-top:14px">
+      <div class="line"><span>Pagás contado</span><b id="contado"></b></div>
+      <div class="line"><span>Valor de cada cuota</span><b id="cuota"></b></div>
+      <div class="line"><span>Total en cuotas</span><b id="total"></b></div>
+      <div class="line"><span>Cuotas en plata de hoy</span><b id="real"></b></div>
+    </div>
+    <button class="sec" onclick="compartir()">Compartir resultado</button>
+  </div>
+
+  <footer>
+    Hecho en Argentina 🇦🇷 · Es una estimación, no un consejo financiero.<br>
+    ¿Te sirvió? <a href="#" id="cafecito">Invitame un cafecito ☕</a>
+  </footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const pesos = n => n.toLocaleString('es-AR', {style:'currency', currency:'ARS', maximumFractionDigits:0});
+let ultimo = '';
+
+function calcular(){
+  const precio  = parseFloat($('precio').value);
+  const desc    = parseFloat($('desc').value)    || 0;
+  const n       = parseInt($('cuotas').value)    || 1;
+  const recargo = parseFloat($('recargo').value) || 0;
+  const infl    = (parseFloat($('infl').value)   || 0) / 100;
+  if(!precio){ alert('Poné el precio de lista'); return; }
+
+  const contado = precio * (1 - desc/100);
+  const total   = precio * (1 + recargo/100);
+  const cuota   = total / n;
+
+  // Cada cuota se paga un mes más tarde: la "traemos" a plata de hoy
+  let real = 0;
+  for(let i = 1; i <= n; i++){ real += cuota / Math.pow(1 + infl, i); }
+
+  const dif = Math.abs(contado - real);
+  const convieneCuotas = real < contado;
+
+  $('verdict').textContent = convieneCuotas ? '✅ Conviene en cuotas' : '💵 Conviene contado';
+  $('verdict').style.color = convieneCuotas ? 'var(--ok)' : 'var(--warn)';
+  $('ahorro').textContent  = pesos(dif);
+  $('ahorroTxt').textContent = 'es lo que ahorrás (en plata de hoy) eligiendo ' + (convieneCuotas ? 'cuotas' : 'contado');
+  $('contado').textContent = pesos(contado);
+  $('cuota').textContent   = n + ' x ' + pesos(cuota);
+  $('total').textContent   = pesos(total);
+  $('real').textContent    = pesos(real);
+  $('res').style.display   = 'block';
+  $('res').scrollIntoView({behavior:'smooth'});
+
+  ultimo = (convieneCuotas ? 'Me conviene en cuotas' : 'Me conviene contado') +
+           ' y ahorro ' + pesos(dif) + '. Calculalo vos:';
+}
+
+function compartir(){
+  const url = location.href;
+  if(navigator.share){ navigator.share({title:'¿Cuotas o contado?', text: ultimo, url}); }
+  else { navigator.clipboard.writeText(ultimo + ' ' + url); alert('¡Copiado!'); }
+}
+</script>
+</body>
+</html>
